@@ -46,9 +46,14 @@ const rulerValue = document.querySelector('[data-ruler-value]');
 const MAX_WINDOWS = 8;
 let activeWidthInput = null;
 
-const initialWindows = [
+const homeCampaign = window.BlackoutHomeCampaign?.getPreset(window.location.search);
+const initialWindows = homeCampaign?.windows || [
   { room: 'Sala principal', product: 'screen', width: 2, height: 2.2 }
 ];
+if (homeCampaign) {
+  document.querySelector('.quote-intro h1').textContent = homeCampaign.title;
+  document.querySelector('#home-campaign-note').hidden = false;
+}
 
 function formatNumber(value) {
   return new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
@@ -273,7 +278,7 @@ sendButton.addEventListener('click', async () => {
     phone,
     termsAccepted: true,
     location: selectedLocation(),
-    needs: [...document.querySelectorAll('input[name="needs"]:checked')].map((input) => input.value),
+    needs: [...document.querySelectorAll('input[name="needs"]:checked')].map((input) => input.value).concat(homeCampaign ? ['Estoy preparando las cortinas de mi casa nueva'] : []),
     windows: rows().map(rowData),
     quote: {
       area: quote.area,

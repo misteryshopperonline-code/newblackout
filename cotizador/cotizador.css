@@ -40,3 +40,9 @@ fieldset{min-width:0;margin:76px 0 0;padding:0;border:0}fieldset legend{display:
 @media(pointer:coarse){.add-window,.price-breakdown summary{min-height:48px}.need-options label,.location-options label,.send-quote{min-height:52px}}
 @supports(padding:max(0px)){@media(max-width:820px){.quote-nav{padding-left:max(22px,env(safe-area-inset-left));padding-right:max(22px,env(safe-area-inset-right))}.quote-intro,.quote-form,.quote-summary,.measure-guide{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}.quote-footer{padding-bottom:max(25px,env(safe-area-inset-bottom))}}}
 .consent-field{display:flex!important;align-items:flex-start;gap:10px;margin-top:16px;color:#c9bec9!important;font-size:.72rem!important;font-weight:400!important;line-height:1.5}.consent-field input{width:17px;height:17px;flex:0 0 auto;margin:1px 0 0;accent-color:var(--violet)}.consent-field span{max-width:42ch}
+/* Campaign guidance is visible only for the new-home entry path. */
+.home-campaign-note { margin:0 7vw 32px; padding:22px 24px; background:#eee8ed; color:#433b45; font-size:1rem; line-height:1.7; }
+.home-campaign-note[hidden] { display:none; }
+.home-campaign-note p { max-width:75ch; margin:0 0 12px; }
+.home-campaign-note a { color:#654878; text-decoration:underline; text-underline-offset:4px; }
+@media(max-width:820px) { .home-campaign-note { margin:0 20px 28px; padding:20px; } }

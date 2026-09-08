@@ -32,7 +32,16 @@
       <section class="crm-shell">
         <header class="crm-header">
           <div><span class="brand-mark" aria-hidden="true">B</span><strong>BLACKOUT</strong><small>CRM COMERCIAL</small></div>
-          <div class="user-menu"><span id="active-user"></span><button type="button" id="logout">Salir</button></div>
+          <div class="user-menu">
+            <div class="notif-wrap">
+              <button type="button" id="notif-bell" aria-haspopup="true" aria-expanded="false" aria-label="Notificaciones"><span class="bell-icon" aria-hidden="true">&#128276;</span><span class="notif-badge" id="notif-badge" hidden>0</span></button>
+              <div class="notif-panel" id="notif-panel" hidden>
+                <div class="notif-panel-header"><strong>Notificaciones</strong><button type="button" id="notif-mark-all">Marcar todas como leídas</button></div>
+                <div class="notif-list" id="notif-list"></div>
+              </div>
+            </div>
+            <span id="active-user"></span><button type="button" id="logout">Salir</button>
+          </div>
         </header>
         <div class="crm-content">
           <section class="pipeline-heading"><div><h1>Prospectos</h1><p>Solicitudes recibidas desde el cotizador.</p></div><p class="lead-count" id="lead-count"></p></section>

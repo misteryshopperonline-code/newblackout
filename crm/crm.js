@@ -3,6 +3,11 @@ const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: '
 const number = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let leads = [];
 let selectedLeadId = null;
+let notifications = [];
+let notifPanelOpen = false;
+let pollTimer = null;
+const leadSnapshot = new Map();
+const POLL_INTERVAL_MS = 25000;
 
 function escapeHtml(value) {
   const node = document.createElement('span');
@@ -21,6 +26,128 @@ function replaceLead(updatedLead) {
 function removeLead(id) {
   leads = leads.filter((lead) => lead.id !== id);
 }
+
+function buildSnapshotEntry(lead) {
+  return { status: lead.status, notesCount: Array.isArray(lead.notes) ? lead.notes.length : 0 };
+}
+
+function syncSnapshot(list) {
+  list.forEach((lead) => leadSnapshot.set(lead.id, buildSnapshotEntry(lead)));
+}
+
+function addNotification(type, lead, message) {
+  notifications = [{ id: crypto.randomUUID(), type, leadId: lead.id, message, createdAt: new Date().toISOString(), read: false }, ...notifications].slice(0, 50);
+}
+
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    oscillator.connect(gain).connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function requestNotifPermission() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+  Notification.requestPermission();
+}
+
+function notifyExternally(freshNotifications) {
+  playChime();
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+    freshNotifications.slice(0, 3).forEach((notification) => new Notification('Blackout CRM', { body: notification.message }));
+  }
+}
+
+function renderNotifPanel() {
+  const badge = document.querySelector('#notif-badge');
+  const list = document.querySelector('#notif-list');
+  const panel = document.querySelector('#notif-panel');
+  const bell = document.querySelector('#notif-bell');
+  const markAll = document.querySelector('#notif-mark-all');
+  if (!badge || !list || !panel || !bell || !markAll) return;
+  const unread = notifications.filter((notification) => !notification.read).length;
+  badge.textContent = String(unread);
+  badge.hidden = unread === 0;
+  list.innerHTML = notifications.length ? notifications.map((notification) => `<button type="button" class="notif-item${notification.read ? '' : ' is-unread'}" data-notif-id="${notification.id}" data-lead-id="${escapeHtml(notification.leadId)}"><span>${escapeHtml(notification.message)}</span><time>${new Intl.DateTimeFormat('es-EC', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(notification.createdAt))}</time></button>`).join('') : '<p class="notif-empty">Sin notificaciones por ahora.</p>';
+  panel.hidden = !notifPanelOpen;
+  bell.setAttribute('aria-expanded', String(notifPanelOpen));
+  list.querySelectorAll('[data-notif-id]').forEach((button) => button.addEventListener('click', () => {
+    const notification = notifications.find((item) => item.id === button.dataset.notifId);
+    if (notification) notification.read = true;
+    selectedLeadId = button.dataset.leadId;
+    notifPanelOpen = false;
+    renderDashboard();
+  }));
+  bell.onclick = () => {
+    notifPanelOpen = !notifPanelOpen;
+    if (notifPanelOpen) requestNotifPermission();
+    renderNotifPanel();
+  };
+  markAll.onclick = () => {
+    notifications.forEach((notification) => { notification.read = true; });
+    renderNotifPanel();
+  };
+}
+
+function renderLeadList() {
+  const list = document.querySelector('#lead-list');
+  if (!list) return;
+  document.querySelector('#lead-count').textContent = `${leads.length} ${leads.length === 1 ? 'prospecto' : 'prospectos'}`;
+  list.innerHTML = leads.length ? leads.map((lead) => `<button class="lead-row${lead.id === selectedLeadId ? ' is-selected' : ''}" type="button" data-id="${lead.id}"><span><strong>${escapeHtml(lead.name)}</strong><span>${escapeHtml(lead.email)}</span><span class="status" data-status="${escapeHtml(lead.status)}">${escapeHtml(lead.status)}</span>${lead.duplicateMatches?.length ? `<span class="duplicate-badge">Duplicado · ${lead.duplicateMatches.length + 1} registros</span>` : ''}</span><time datetime="${lead.createdAt}">${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(lead.createdAt))}</time></button>`).join('') : '<p class="empty-state">Todavía no hay solicitudes del cotizador.</p>';
+  list.querySelectorAll('.lead-row').forEach((button) => button.addEventListener('click', () => { selectedLeadId = button.dataset.id; renderDashboard(); }));
+}
+
+async function pollLeads() {
+  try {
+    const freshLeads = (await request('/.netlify/functions/crm-leads')).leads;
+    let freshCount = 0;
+    freshLeads.forEach((lead) => {
+      const previous = leadSnapshot.get(lead.id);
+      const notesCount = Array.isArray(lead.notes) ? lead.notes.length : 0;
+      if (!previous) {
+        addNotification('new-lead', lead, `Nuevo prospecto: ${lead.name}`);
+        freshCount += 1;
+      } else {
+        if (previous.status !== lead.status) { addNotification('status', lead, `${lead.name} pasó a "${lead.status}"`); freshCount += 1; }
+        if (notesCount > previous.notesCount) { addNotification('note', lead, `Nueva nota de seguimiento en ${lead.name}`); freshCount += 1; }
+      }
+    });
+    leads = freshLeads;
+    syncSnapshot(freshLeads);
+    renderLeadList();
+    if (freshCount) {
+      renderNotifPanel();
+      notifyExternally(notifications.slice(0, freshCount));
+    }
+  } catch {
+    /* silent: keep polling on transient network errors */
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollLeads, POLL_INTERVAL_MS);
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+  notifications = [];
+  leadSnapshot.clear();
+}
+
+document.addEventListener('click', (event) => {
+  if (notifPanelOpen && !event.target.closest('.notif-wrap')) { notifPanelOpen = false; renderNotifPanel(); }
+});
 
 async function request(url, options) {
   const response = await fetch(url, options);
@@ -87,11 +214,9 @@ function renderDetail() {
 function renderDashboard() {
   app.replaceChildren(document.querySelector('#crm-view').content.cloneNode(true));
   document.querySelector('#active-user').textContent = window.crmUser;
-  document.querySelector('#lead-count').textContent = `${leads.length} ${leads.length === 1 ? 'prospecto' : 'prospectos'}`;
-  const list = document.querySelector('#lead-list');
-  list.innerHTML = leads.length ? leads.map((lead) => `<button class="lead-row${lead.id === selectedLeadId ? ' is-selected' : ''}" type="button" data-id="${lead.id}"><span><strong>${escapeHtml(lead.name)}</strong><span>${escapeHtml(lead.email)}</span><span class="status" data-status="${escapeHtml(lead.status)}">${escapeHtml(lead.status)}</span>${lead.duplicateMatches?.length ? `<span class="duplicate-badge">Duplicado · ${lead.duplicateMatches.length + 1} registros</span>` : ''}</span><time datetime="${lead.createdAt}">${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(lead.createdAt))}</time></button>`).join('') : '<p class="empty-state">Todavía no hay solicitudes del cotizador.</p>';
-  list.querySelectorAll('.lead-row').forEach((button) => button.addEventListener('click', () => { selectedLeadId = button.dataset.id; renderDashboard(); }));
-  document.querySelector('#logout').addEventListener('click', async () => { await request('/.netlify/functions/crm-auth', { method: 'DELETE' }); renderLogin(); });
+  renderLeadList();
+  renderNotifPanel();
+  document.querySelector('#logout').addEventListener('click', async () => { await request('/.netlify/functions/crm-auth', { method: 'DELETE' }); stopPolling(); renderLogin(); });
   renderDetail();
 }
 
@@ -107,7 +232,13 @@ function renderLogin(message = '') {
 }
 
 async function loadDashboard() {
-  try { leads = (await request('/.netlify/functions/crm-leads')).leads; selectedLeadId = leads[0]?.id || null; renderDashboard(); } catch (error) { renderLogin(error.message); }
+  try {
+    leads = (await request('/.netlify/functions/crm-leads')).leads;
+    selectedLeadId = leads[0]?.id || null;
+    syncSnapshot(leads);
+    renderDashboard();
+    startPolling();
+  } catch (error) { renderLogin(error.message); }
 }
 
 (async () => { try { const session = await request('/.netlify/functions/crm-auth'); if (!session.authenticated) return renderLogin(); window.crmUser = session.user; await loadDashboard(); } catch { renderLogin(); } })();
