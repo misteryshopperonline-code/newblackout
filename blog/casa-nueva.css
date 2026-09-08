@@ -1,0 +1,5 @@
+.home-guide .article-meta { font-size:.9rem; text-transform:none; letter-spacing:normal; }
+.home-guide .brand small { font-size:.625rem; }
+.home-guide .prose li { margin-block:12px; line-height:1.75; }
+.home-guide :focus-visible { outline:3px solid #654878; outline-offset:4px; }
+.home-guide ::selection { color:#fff; background:#654878; }
