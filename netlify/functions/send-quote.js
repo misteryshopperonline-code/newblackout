@@ -88,6 +88,7 @@ function createQuotePdf({ name, location, needs, windows, quote }) {
 exports.createQuotePdf = createQuotePdf;
 
 exports.handler = async (event) => {
+  const requestId = crypto.randomUUID();
   if (event.httpMethod !== 'POST') return response(405, { error: 'Method not allowed.' });
 
   let request;
@@ -135,13 +136,12 @@ exports.handler = async (event) => {
       errorMessage: error.message,
       stack: error.stack,
       nodeVersion: process.version,
-      pdfkitVersion: require('pdfkit/package.json').version,
       windowCount: validWindows.length,
       quote: { area: quote.area, low: quote.low, high: quote.high }
     }));
     return response(500, { error: 'No pudimos generar el PDF de tu cotización.' });
   }
-  console.info('Quote PDF generated:', JSON.stringify({ bytes: quotePdf.length, windowCount: validWindows.length, nodeVersion: process.version, pdfkitVersion: require('pdfkit/package.json').version }));
+  console.info('Quote PDF generated:', JSON.stringify({ requestId, bytes: quotePdf.length, windowCount: validWindows.length, nodeVersion: process.version }));
 
   const cleanName = escapeHtml(name.trim());
   const cleanLocation = escapeHtml(typeof location === 'string' ? location : 'Por confirmar');
@@ -183,28 +183,35 @@ exports.handler = async (event) => {
       </div>
     </div>`;
 
-  const resendResponse = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL,
-      to: [normalizedEmail],
-      subject,
-      html,
-      text,
-      attachments: [{ filename: 'cotizacion-blackout.pdf', content: quotePdf.toString('base64') }],
-      reply_to: process.env.RESEND_REPLY_TO || 'info@blackout.com.ec',
-      ...(process.env.QUOTE_NOTIFICATION_EMAIL ? { bcc: [process.env.QUOTE_NOTIFICATION_EMAIL] } : {})
-    })
-  });
+  const emailPayload = {
+    from: process.env.RESEND_FROM_EMAIL,
+    to: [normalizedEmail],
+    subject,
+    html,
+    text,
+    attachments: [{ filename: 'cotizacion-blackout.pdf', content: quotePdf.toString('base64') }],
+    reply_to: process.env.RESEND_REPLY_TO || 'info@blackout.com.ec',
+    ...(process.env.QUOTE_NOTIFICATION_EMAIL ? { bcc: [process.env.QUOTE_NOTIFICATION_EMAIL] } : {})
+  };
+  let resendResponse;
+  try {
+    resendResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailPayload)
+    });
+  } catch (error) {
+    console.error('Resend request failed:', JSON.stringify({ requestId, errorName: error.name, errorMessage: error.message, cause: error.cause?.message, stack: error.stack, nodeVersion: process.version, pdfBytes: quotePdf.length }));
+    return response(502, { error: `No pudimos conectar con el servicio de correo. Inténtalo nuevamente. Código: ${requestId}` });
+  }
 
   if (!resendResponse.ok) {
     const resendError = await resendResponse.text();
-    console.error('Resend rejected quote email:', resendResponse.status, resendError);
-    return response(502, { error: 'No pudimos enviar la cotización. Inténtalo nuevamente.' });
+    console.error('Resend rejected quote email:', JSON.stringify({ requestId, status: resendResponse.status, response: resendError, pdfBytes: quotePdf.length }));
+    return response(502, { error: `No pudimos enviar la cotización. Inténtalo nuevamente. Código: ${requestId}` });
   }
 
   try {

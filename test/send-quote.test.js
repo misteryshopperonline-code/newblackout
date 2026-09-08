@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { createQuotePdf } = require('../netlify/functions/send-quote');
+const { createQuotePdf, handler } = require('../netlify/functions/send-quote');
 
 function quote(overrides = {}) {
   return {
@@ -42,4 +42,29 @@ test('Netlify incluye las fuentes dinámicas de PDFKit en las funciones', () => 
   assert.match(config, /external_node_modules\s*=\s*\["pdfkit"\]/);
   assert.match(config, /node_modules\/pdfkit\/js\/standard-fonts\/\*\*/);
   assert.match(config, /node_modules\/pdfkit\/js\/data\/\*\*/);
+});
+
+test('devuelve un 502 trazable cuando Resend no puede recibir la cotización', async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.RESEND_API_KEY;
+  const originalFromEmail = process.env.RESEND_FROM_EMAIL;
+  process.env.RESEND_API_KEY = 'test-key';
+  process.env.RESEND_FROM_EMAIL = 'cotizaciones@blackout.com.ec';
+  global.fetch = async () => { throw new TypeError('fetch failed'); };
+
+  try {
+    const result = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({ ...quote(), email: 'ana@blackout.com.ec', phone: '0992933619' })
+    });
+    const body = JSON.parse(result.body);
+    assert.equal(result.statusCode, 502);
+    assert.match(body.error, /Código: [\da-f-]{36}/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = originalApiKey;
+    if (originalFromEmail === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = originalFromEmail;
+  }
 });
