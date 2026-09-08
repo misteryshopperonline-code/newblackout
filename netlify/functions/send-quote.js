@@ -60,7 +60,7 @@ exports.handler = async (event) => {
 
   if (!windowRows.length) return response(400, { error: 'Invalid window details.' });
 
-  await saveLead({
+  await saveLead(event, {
     id: crypto.randomUUID(),
     name: name.trim(),
     email: email.trim(),

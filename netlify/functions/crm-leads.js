@@ -1,15 +1,20 @@
-const { getStore } = require('@netlify/blobs');
+const { connectLambda, getStore } = require('@netlify/blobs');
 const { requireSession } = require('./crm-auth');
 
 function response(statusCode, body) {
   return { statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
 }
 
+function configureBlobs(event) {
+  if (event?.blobs) connectLambda(event);
+}
+
 async function getLeads() {
   return (await getStore('prospects').get('leads', { type: 'json' })) || [];
 }
 
-exports.saveLead = async (lead) => {
+exports.saveLead = async (event, lead) => {
+  configureBlobs(event);
   const store = getStore('prospects');
   const leads = await getLeads();
   await store.setJSON('leads', [lead, ...leads].slice(0, 500));
@@ -18,6 +23,7 @@ exports.saveLead = async (lead) => {
 exports.handler = async (event) => {
   if (!requireSession(event)) return response(401, { error: 'Unauthorized.' });
   try {
+    configureBlobs(event);
     if (event.httpMethod === 'GET') return response(200, { leads: await getLeads() });
     if (event.httpMethod !== 'PATCH') return response(405, { error: 'Method not allowed.' });
     let request;
