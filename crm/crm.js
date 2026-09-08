@@ -48,7 +48,55 @@ function readFileAsBase64(file) {
 }
 
 function evidenceFileHtml(file) {
-  return `<div class="evidence-file"><a href="/.netlify/functions/crm-lead-files?key=${encodeURIComponent(file.key)}" target="_blank" rel="noopener">${escapeHtml(file.name)}</a><span>${formatFileSize(file.size)} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(file.uploadedAt))}</span><button type="button" class="evidence-delete" data-file-id="${file.id}" aria-label="Eliminar ${escapeHtml(file.name)}">✕</button></div>`;
+  return `<div class="evidence-file"><button type="button" class="evidence-view" data-file-key="${escapeHtml(file.key)}" data-file-name="${escapeHtml(file.name)}" data-file-type="${escapeHtml(file.contentType || '')}">${escapeHtml(file.name)}</button><span>${formatFileSize(file.size)} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(file.uploadedAt))}</span><button type="button" class="evidence-delete" data-file-id="${file.id}" aria-label="Eliminar ${escapeHtml(file.name)}">✕</button></div>`;
+}
+
+let fileViewerObjectUrl = null;
+
+function handleFileViewerKeydown(event) {
+  if (event.key === 'Escape') closeFileViewer();
+}
+
+function closeFileViewer() {
+  document.querySelector('#file-viewer-modal')?.remove();
+  if (fileViewerObjectUrl) { URL.revokeObjectURL(fileViewerObjectUrl); fileViewerObjectUrl = null; }
+  document.removeEventListener('keydown', handleFileViewerKeydown);
+}
+
+async function openFileViewer({ key, name, contentType }) {
+  closeFileViewer();
+  const modal = document.createElement('div');
+  modal.id = 'file-viewer-modal';
+  modal.className = 'file-viewer-modal';
+  modal.innerHTML = `<div class="file-viewer-panel" role="dialog" aria-modal="true" aria-label="${escapeHtml(name)}"><div class="file-viewer-header"><strong>${escapeHtml(name)}</strong><div class="file-viewer-actions"><button type="button" class="file-viewer-download" disabled>Descargar</button><button type="button" class="file-viewer-close" aria-label="Cerrar visor">✕</button></div></div><div class="file-viewer-body"><p class="file-viewer-status">Cargando documento…</p></div></div>`;
+  document.body.appendChild(modal);
+  document.addEventListener('keydown', handleFileViewerKeydown);
+  modal.addEventListener('click', (event) => { if (event.target === modal) closeFileViewer(); });
+  modal.querySelector('.file-viewer-close').addEventListener('click', closeFileViewer);
+  const body = modal.querySelector('.file-viewer-body');
+  const downloadButton = modal.querySelector('.file-viewer-download');
+  try {
+    const fileResponse = await fetch(`/.netlify/functions/crm-lead-files?key=${encodeURIComponent(key)}`);
+    if (!fileResponse.ok) throw new Error('No pudimos abrir el archivo.');
+    const blob = await fileResponse.blob();
+    fileViewerObjectUrl = URL.createObjectURL(blob);
+    downloadButton.disabled = false;
+    downloadButton.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = fileViewerObjectUrl;
+      link.download = name;
+      link.click();
+    });
+    if (contentType === 'application/pdf') {
+      body.innerHTML = `<iframe class="file-viewer-frame" src="${fileViewerObjectUrl}" title="${escapeHtml(name)}"></iframe>`;
+    } else if (contentType?.startsWith('image/')) {
+      body.innerHTML = `<img class="file-viewer-image" src="${fileViewerObjectUrl}" alt="${escapeHtml(name)}" />`;
+    } else {
+      body.innerHTML = '<p class="file-viewer-status">Este tipo de archivo no se puede previsualizar. Usa "Descargar".</p>';
+    }
+  } catch (error) {
+    body.innerHTML = `<p class="file-viewer-status">${escapeHtml(error.message)}</p>`;
+  }
 }
 
 function evidenceSectionHtml(lead) {
@@ -206,6 +254,7 @@ function stopPolling() {
   pollTimer = null;
   notifications = [];
   leadSnapshot.clear();
+  closeFileViewer();
 }
 
 document.addEventListener('click', (event) => {
@@ -267,6 +316,9 @@ function renderDetail() {
       evidenceError.textContent = requestError.message;
       label.removeAttribute('aria-busy');
     }
+  }));
+  detail.querySelectorAll('.evidence-view').forEach((button) => button.addEventListener('click', () => {
+    openFileViewer({ key: button.dataset.fileKey, name: button.dataset.fileName, contentType: button.dataset.fileType });
   }));
   detail.querySelectorAll('.evidence-delete').forEach((button) => button.addEventListener('click', async () => {
     if (!window.confirm('¿Eliminar este archivo adjunto?')) return;
