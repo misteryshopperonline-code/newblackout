@@ -31,12 +31,33 @@ function buildSnapshotEntry(lead) {
   return { status: lead.status, notesCount: Array.isArray(lead.notes) ? lead.notes.length : 0 };
 }
 
+const PIPELINE_STAGES = ['Nuevo', 'Contactado', 'Visita técnica', 'Propuesta enviada', 'Ganado'];
+
+function formatLeadTimestamp(iso) {
+  const date = new Date(iso);
+  const time = new Intl.DateTimeFormat('es-EC', { timeStyle: 'short' }).format(date);
+  if (new Date().toDateString() === date.toDateString()) return `hoy, ${time}`;
+  return `${new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short' }).format(date)}, ${time}`;
+}
+
+function statusPipelineHtml(lead) {
+  if (lead.status === 'Perdido') {
+    return `<div class="status-pipeline is-lost" aria-label="Estado de ${escapeHtml(lead.name)}"><p class="lost-banner">Prospecto marcado como <strong>perdido</strong></p><button type="button" class="reopen-lead" data-status="Contactado">Reactivar prospecto</button></div>`;
+  }
+  const currentIndex = PIPELINE_STAGES.indexOf(lead.status);
+  const steps = PIPELINE_STAGES.map((stage, index) => {
+    const state = index < currentIndex ? 'is-done' : index === currentIndex ? 'is-current' : 'is-upcoming';
+    return `<li class="step ${state}"><button type="button" data-status="${stage}" aria-current="${index === currentIndex ? 'step' : 'false'}"><span class="step-index">${index < currentIndex ? '✓' : index + 1}</span><span class="step-label">${stage}</span></button></li>`;
+  }).join('');
+  return `<div class="status-pipeline" role="group" aria-label="Estado de ${escapeHtml(lead.name)}"><ol class="pipeline-steps">${steps}</ol><button type="button" class="mark-lost" data-status="Perdido">Marcar como perdido</button></div>`;
+}
+
 function syncSnapshot(list) {
   list.forEach((lead) => leadSnapshot.set(lead.id, buildSnapshotEntry(lead)));
 }
 
 function addNotification(type, lead, message) {
-  notifications = [{ id: crypto.randomUUID(), type, leadId: lead.id, message, createdAt: new Date().toISOString(), read: false }, ...notifications].slice(0, 50);
+  notifications = [{ id: crypto.randomUUID(), type, leadId: lead.id, message, createdAt: new Date().toISOString(), leadRegisteredAt: lead.createdAt, read: false }, ...notifications].slice(0, 50);
 }
 
 function playChime() {
@@ -77,7 +98,7 @@ function renderNotifPanel() {
   const unread = notifications.filter((notification) => !notification.read).length;
   badge.textContent = String(unread);
   badge.hidden = unread === 0;
-  list.innerHTML = notifications.length ? notifications.map((notification) => `<button type="button" class="notif-item${notification.read ? '' : ' is-unread'}" data-notif-id="${notification.id}" data-lead-id="${escapeHtml(notification.leadId)}"><span>${escapeHtml(notification.message)}</span><time>${new Intl.DateTimeFormat('es-EC', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(notification.createdAt))}</time></button>`).join('') : '<p class="notif-empty">Sin notificaciones por ahora.</p>';
+  list.innerHTML = notifications.length ? notifications.map((notification) => `<button type="button" class="notif-item${notification.read ? '' : ' is-unread'}" data-notif-id="${notification.id}" data-lead-id="${escapeHtml(notification.leadId)}"><span class="notif-message">${escapeHtml(notification.message)}</span><time class="notif-registered" datetime="${notification.leadRegisteredAt}">Registrado ${formatLeadTimestamp(notification.leadRegisteredAt)}</time></button>`).join('') : '<p class="notif-empty">Sin notificaciones por ahora.</p>';
   panel.hidden = !notifPanelOpen;
   bell.setAttribute('aria-expanded', String(notifPanelOpen));
   list.querySelectorAll('[data-notif-id]').forEach((button) => button.addEventListener('click', () => {
@@ -165,12 +186,21 @@ function renderDetail() {
   const notes = Array.isArray(lead.notes) ? lead.notes : [];
   const duplicateMatches = Array.isArray(lead.duplicateMatches) ? lead.duplicateMatches : [];
   const duplicateNotice = duplicateMatches.length ? `<section class="duplicate-alert"><strong>Posible registro duplicado</strong><p>Encontramos ${duplicateMatches.length} ${duplicateMatches.length === 1 ? 'registro relacionado' : 'registros relacionados'} por correo o celular.</p><ul>${duplicateMatches.map((match) => `<li><button type="button" class="duplicate-link" data-duplicate-id="${escapeHtml(match.id)}"><strong>${escapeHtml(match.name)}</strong><span>${escapeHtml(match.email)} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(match.createdAt))}</span></button></li>`).join('')}</ul></section>` : '';
-  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div><select id="lead-status" aria-label="Estado de ${escapeHtml(lead.name)}">${['Nuevo','Contactado','Visita técnica','Propuesta enviada','Ganado','Perdido'].map((status) => `<option${status === lead.status ? ' selected' : ''}>${status}</option>`).join('')}</select></div>${duplicateNotice}<section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section><section class="detail-block danger-zone"><button class="delete-lead" id="delete-lead" type="button">Eliminar prospecto</button><p class="detail-error" id="delete-error" aria-live="polite"></p></section>`;
+  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div></div>${statusPipelineHtml(lead)}${duplicateNotice}<section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section><section class="detail-block danger-zone"><button class="delete-lead" id="delete-lead" type="button">Eliminar prospecto</button><p class="detail-error" id="delete-error" aria-live="polite"></p></section>`;
   detail.querySelectorAll('[data-duplicate-id]').forEach((button) => button.addEventListener('click', () => { selectedLeadId = button.dataset.duplicateId; renderDashboard(); }));
-  document.querySelector('#lead-status').addEventListener('change', async (event) => {
-    event.target.disabled = true;
-    try { replaceLead((await request('/.netlify/functions/crm-leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, status: event.target.value }) })).lead); renderDashboard(); } catch (error) { event.target.value = lead.status; alert(error.message); } finally { event.target.disabled = false; }
-  });
+  detail.querySelectorAll('.status-pipeline [data-status]').forEach((button) => button.addEventListener('click', async () => {
+    const newStatus = button.dataset.status;
+    if (newStatus === lead.status) return;
+    const pipeline = button.closest('.status-pipeline');
+    pipeline.querySelectorAll('button').forEach((item) => { item.disabled = true; });
+    try {
+      replaceLead((await request('/.netlify/functions/crm-leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, status: newStatus }) })).lead);
+      renderDashboard();
+    } catch (error) {
+      alert(error.message);
+      pipeline.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+    }
+  }));
   document.querySelector('#lead-phone-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const input = document.querySelector('#lead-phone');
