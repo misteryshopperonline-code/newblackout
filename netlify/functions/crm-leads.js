@@ -34,6 +34,21 @@ exports.handler = async (event) => {
   try {
     configureBlobs(event);
     if (event.httpMethod === 'GET') return response(200, { leads: await getLeads() });
+    if (event.httpMethod === 'DELETE') {
+      let request;
+      try {
+        request = JSON.parse(event.body || '{}');
+      } catch {
+        return response(400, { error: 'Invalid request body.' });
+      }
+      if (typeof request.id !== 'string') return response(400, { error: 'Invalid delete request.' });
+      const store = getStore('prospects');
+      const leads = await getLeads();
+      const updated = leads.filter((lead) => lead.id !== request.id);
+      if (updated.length === leads.length) return response(404, { error: 'Lead not found.' });
+      await store.setJSON('leads', updated);
+      return response(200, { success: true });
+    }
     if (event.httpMethod !== 'PATCH') return response(405, { error: 'Method not allowed.' });
     let request;
     try {

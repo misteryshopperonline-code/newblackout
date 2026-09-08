@@ -18,6 +18,10 @@ function replaceLead(updatedLead) {
   leads = leads.map((lead) => lead.id === updatedLead.id ? updatedLead : lead);
 }
 
+function removeLead(id) {
+  leads = leads.filter((lead) => lead.id !== id);
+}
+
 async function request(url, options) {
   const response = await fetch(url, options);
   const data = await response.json();
@@ -32,7 +36,7 @@ function renderDetail() {
   const quote = lead.quote;
   const phone = typeof lead.phone === 'string' ? lead.phone : '';
   const notes = Array.isArray(lead.notes) ? lead.notes : [];
-  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div><select id="lead-status" aria-label="Estado de ${escapeHtml(lead.name)}">${['Nuevo','Contactado','Visita técnica','Propuesta enviada','Ganado','Perdido'].map((status) => `<option${status === lead.status ? ' selected' : ''}>${status}</option>`).join('')}</select></div><section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section>`;
+  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div><select id="lead-status" aria-label="Estado de ${escapeHtml(lead.name)}">${['Nuevo','Contactado','Visita técnica','Propuesta enviada','Ganado','Perdido'].map((status) => `<option${status === lead.status ? ' selected' : ''}>${status}</option>`).join('')}</select></div><section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section><section class="detail-block danger-zone"><button class="delete-lead" id="delete-lead" type="button">Eliminar prospecto</button><p class="detail-error" id="delete-error" aria-live="polite"></p></section>`;
   document.querySelector('#lead-status').addEventListener('change', async (event) => {
     event.target.disabled = true;
     try { replaceLead((await request('/.netlify/functions/crm-leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, status: event.target.value }) })).lead); renderDashboard(); } catch (error) { event.target.value = lead.status; alert(error.message); } finally { event.target.disabled = false; }
@@ -58,6 +62,22 @@ function renderDetail() {
     button.disabled = true;
     error.textContent = '';
     try { replaceLead((await request('/.netlify/functions/crm-leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, note }) })).lead); renderDetail(); } catch (requestError) { error.textContent = requestError.message; } finally { button.disabled = false; }
+  });
+  document.querySelector('#delete-lead').addEventListener('click', async (event) => {
+    if (!window.confirm(`¿Eliminar permanentemente el prospecto ${lead.name}? Esta acción no se puede deshacer.`)) return;
+    const button = event.currentTarget;
+    const error = document.querySelector('#delete-error');
+    button.disabled = true;
+    error.textContent = '';
+    try {
+      await request('/.netlify/functions/crm-leads', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id }) });
+      removeLead(lead.id);
+      selectedLeadId = leads[0]?.id || null;
+      renderDashboard();
+    } catch (requestError) {
+      error.textContent = requestError.message;
+      button.disabled = false;
+    }
   });
 }
 

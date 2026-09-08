@@ -1,6 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "@netlify/blobs": "^8.1.0",
+    "pdfkit": "^0.20.2"
   }
 }
