@@ -2,6 +2,7 @@ const { connectLambda, getStore } = require('@netlify/blobs');
 const { requireSession } = require('./crm-auth');
 
 const ALLOWED_STATUSES = ['Nuevo', 'Contactado', 'Visita técnica', 'Propuesta enviada', 'Ganado', 'Perdido'];
+const REQUIRED_EVIDENCE_CATEGORIES = ['cotizacion_original', 'factura_servicio', 'factura_pago'];
 const ECUADOR_MOBILE_PATTERN = /^09\d{8}$/;
 const MAX_NOTE_LENGTH = 2000;
 
@@ -96,6 +97,13 @@ exports.handler = async (event) => {
     if (hasNote && (!note || note.length > MAX_NOTE_LENGTH)) return response(400, { error: 'Invalid note.' });
     const store = getStore('prospects');
     const leads = await getLeads();
+    if (hasStatus && request.status === 'Ganado') {
+      const target = leads.find((lead) => lead.id === request.id);
+      if (!target) return response(404, { error: 'Lead not found.' });
+      const files = Array.isArray(target.files) ? target.files : [];
+      const missing = REQUIRED_EVIDENCE_CATEGORIES.some((category) => !files.some((file) => file.category === category));
+      if (missing) return response(400, { error: 'Adjunta la cotización original, la factura del servicio realizado y el comprobante de pago antes de marcar el prospecto como Ganado.' });
+    }
     let updatedLead;
     const updated = leads.map((lead) => {
       if (lead.id !== request.id) return lead;

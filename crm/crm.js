@@ -8,6 +8,13 @@ let notifPanelOpen = false;
 let pollTimer = null;
 const leadSnapshot = new Map();
 const POLL_INTERVAL_MS = 25000;
+const EVIDENCE_CATEGORIES = [
+  { key: 'cotizacion_original', label: 'Cotización original' },
+  { key: 'factura_servicio', label: 'Factura del servicio realizado' },
+  { key: 'factura_pago', label: 'Factura / comprobante de pago' }
+];
+const MAX_EVIDENCE_FILE_BYTES = 8 * 1024 * 1024;
+const ALLOWED_EVIDENCE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
 function escapeHtml(value) {
   const node = document.createElement('span');
@@ -17,6 +24,41 @@ function escapeHtml(value) {
 
 function normalizeEcuadorMobile(value) {
   return value.replace(/[\s-]/g, '');
+}
+
+function hasRequiredEvidence(lead) {
+  const files = Array.isArray(lead.files) ? lead.files : [];
+  return EVIDENCE_CATEGORIES.every((category) => files.some((file) => file.category === category.key));
+}
+
+function formatFileSize(bytes) {
+  if (typeof bytes !== 'number') return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('No pudimos leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function evidenceFileHtml(file) {
+  return `<div class="evidence-file"><a href="/.netlify/functions/crm-lead-files?key=${encodeURIComponent(file.key)}" target="_blank" rel="noopener">${escapeHtml(file.name)}</a><span>${formatFileSize(file.size)} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(file.uploadedAt))}</span><button type="button" class="evidence-delete" data-file-id="${file.id}" aria-label="Eliminar ${escapeHtml(file.name)}">✕</button></div>`;
+}
+
+function evidenceSectionHtml(lead) {
+  const files = Array.isArray(lead.files) ? lead.files : [];
+  const requiredRows = EVIDENCE_CATEGORIES.map((category) => {
+    const existing = files.filter((file) => file.category === category.key);
+    return `<div class="evidence-row"><div class="evidence-label"><span>${category.label}</span>${existing.length ? '<span class="evidence-check">✓ Adjunto</span>' : '<span class="evidence-missing">Pendiente</span>'}</div><div class="evidence-files">${existing.map(evidenceFileHtml).join('')}</div><label class="evidence-upload">Subir archivo<input type="file" accept=".pdf,image/*" data-category="${category.key}" hidden /></label></div>`;
+  }).join('');
+  const otherFiles = files.filter((file) => file.category === 'otro');
+  return `<section class="detail-block evidence-block"><h3>Evidencia de conversión</h3><p class="evidence-hint">Obligatorios para marcar el prospecto como Ganado.</p>${requiredRows}<div class="evidence-row"><div class="evidence-label"><span>Otros documentos</span></div><div class="evidence-files">${otherFiles.map(evidenceFileHtml).join('') || '<span class="evidence-empty">Sin adjuntos</span>'}</div><label class="evidence-upload">Adjuntar<input type="file" accept=".pdf,image/*" data-category="otro" hidden /></label></div><p class="detail-error" id="evidence-error" aria-live="polite"></p></section>`;
 }
 
 function replaceLead(updatedLead) {
@@ -186,11 +228,17 @@ function renderDetail() {
   const notes = Array.isArray(lead.notes) ? lead.notes : [];
   const duplicateMatches = Array.isArray(lead.duplicateMatches) ? lead.duplicateMatches : [];
   const duplicateNotice = duplicateMatches.length ? `<section class="duplicate-alert"><strong>Posible registro duplicado</strong><p>Encontramos ${duplicateMatches.length} ${duplicateMatches.length === 1 ? 'registro relacionado' : 'registros relacionados'} por correo o celular.</p><ul>${duplicateMatches.map((match) => `<li><button type="button" class="duplicate-link" data-duplicate-id="${escapeHtml(match.id)}"><strong>${escapeHtml(match.name)}</strong><span>${escapeHtml(match.email)} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(match.createdAt))}</span></button></li>`).join('')}</ul></section>` : '';
-  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div></div>${statusPipelineHtml(lead)}${duplicateNotice}<section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section><section class="detail-block danger-zone"><button class="delete-lead" id="delete-lead" type="button">Eliminar prospecto</button><p class="detail-error" id="delete-error" aria-live="polite"></p></section>`;
+  detail.innerHTML = `<div class="detail-header"><div><h2>${escapeHtml(lead.name)}</h2><p>${escapeHtml(lead.email)} · ${escapeHtml(lead.location)}</p></div></div>${statusPipelineHtml(lead)}${duplicateNotice}${evidenceSectionHtml(lead)}<section class="detail-block"><h3>Contacto</h3><form class="contact-form" id="lead-phone-form"><label for="lead-phone">Celular ecuatoriano</label><div><input id="lead-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="09[0-9]{8}" value="${escapeHtml(phone)}" placeholder="0992933619" /><button type="submit">Guardar</button></div><p class="detail-error" id="phone-error" aria-live="polite"></p></form></section><section class="detail-block"><h3>Valor referencial</h3><div class="quote-total">${currency.format(quote.low)} - ${currency.format(quote.high)}<span>${number.format(quote.area)} m2 aproximados</span></div></section><section class="detail-block"><h3>Ambientes cotizados</h3><table class="window-table"><thead><tr><th>Ambiente</th><th>Solución</th><th>Medida</th></tr></thead><tbody>${lead.windows.map((window) => `<tr><td>${escapeHtml(window.room)}</td><td>${escapeHtml(window.productLabel)}</td><td>${number.format(window.width)} x ${number.format(window.height)} m</td></tr>`).join('')}</tbody></table></section><section class="detail-block"><h3>Necesidades</h3><p>${lead.needs.length ? lead.needs.map(escapeHtml).join(', ') : 'Necesita recomendación'}</p></section><section class="detail-block notes-block"><h3>Notas de seguimiento</h3><div class="notes-list">${notes.length ? notes.map((note) => `<article class="note"><p>${escapeHtml(note.text)}</p><small>${escapeHtml(note.author || 'Asesor')} · ${new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(note.createdAt))}</small></article>`).join('') : '<p class="empty-notes">Aún no hay notas de seguimiento.</p>'}</div><form class="note-form" id="lead-note-form"><label for="lead-note">Nueva nota</label><textarea id="lead-note" maxlength="2000" required placeholder="Registra el contacto, acuerdos o próximos pasos."></textarea><div><p class="detail-error" id="note-error" aria-live="polite"></p><button type="submit">Agregar nota</button></div></form></section><section class="detail-block danger-zone"><button class="delete-lead" id="delete-lead" type="button">Eliminar prospecto</button><p class="detail-error" id="delete-error" aria-live="polite"></p></section>`;
   detail.querySelectorAll('[data-duplicate-id]').forEach((button) => button.addEventListener('click', () => { selectedLeadId = button.dataset.duplicateId; renderDashboard(); }));
   detail.querySelectorAll('.status-pipeline [data-status]').forEach((button) => button.addEventListener('click', async () => {
     const newStatus = button.dataset.status;
     if (newStatus === lead.status) return;
+    if (newStatus === 'Ganado' && !hasRequiredEvidence(lead)) {
+      const evidenceError = document.querySelector('#evidence-error');
+      if (evidenceError) evidenceError.textContent = 'Adjunta la cotización original, la factura del servicio realizado y el comprobante de pago antes de marcar como Ganado.';
+      document.querySelector('.evidence-block')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     const pipeline = button.closest('.status-pipeline');
     pipeline.querySelectorAll('button').forEach((item) => { item.disabled = true; });
     try {
@@ -199,6 +247,37 @@ function renderDetail() {
     } catch (error) {
       alert(error.message);
       pipeline.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+    }
+  }));
+  detail.querySelectorAll('.evidence-upload input[type=file]').forEach((input) => input.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const category = event.target.dataset.category;
+    const evidenceError = document.querySelector('#evidence-error');
+    evidenceError.textContent = '';
+    if (file.size > MAX_EVIDENCE_FILE_BYTES) { evidenceError.textContent = 'El archivo debe pesar menos de 8MB.'; event.target.value = ''; return; }
+    if (!ALLOWED_EVIDENCE_TYPES.includes(file.type)) { evidenceError.textContent = 'Solo se aceptan PDF o imágenes (PNG, JPG, WEBP).'; event.target.value = ''; return; }
+    const label = event.target.closest('.evidence-upload');
+    label.setAttribute('aria-busy', 'true');
+    try {
+      const dataBase64 = await readFileAsBase64(file);
+      replaceLead((await request('/.netlify/functions/crm-lead-files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id, category, fileName: file.name, contentType: file.type, dataBase64 }) })).lead);
+      renderDetail();
+    } catch (requestError) {
+      evidenceError.textContent = requestError.message;
+      label.removeAttribute('aria-busy');
+    }
+  }));
+  detail.querySelectorAll('.evidence-delete').forEach((button) => button.addEventListener('click', async () => {
+    if (!window.confirm('¿Eliminar este archivo adjunto?')) return;
+    const evidenceError = document.querySelector('#evidence-error');
+    button.disabled = true;
+    try {
+      replaceLead((await request('/.netlify/functions/crm-lead-files', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id, fileId: button.dataset.fileId }) })).lead);
+      renderDetail();
+    } catch (requestError) {
+      evidenceError.textContent = requestError.message;
+      button.disabled = false;
     }
   }));
   document.querySelector('#lead-phone-form').addEventListener('submit', async (event) => {
