@@ -134,9 +134,12 @@
             <input id="lead-name" name="name" type="text" autocomplete="name" placeholder="¿Cómo podemos llamarte?" />
             <label for="lead-email">Tu correo electrónico</label>
             <input id="lead-email" name="email" type="email" autocomplete="email" placeholder="nombre@correo.com" />
+              <label for="lead-phone">Tu celular</label>
+              <input id="lead-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="0992933619" pattern="09[0-9]{8}" maxlength="10" aria-describedby="lead-phone-help" />
+              <small id="lead-phone-help">Ingresa tu número celular ecuatoriano de 10 dígitos.</small>
             <p class="field-error" id="form-error" aria-live="polite"></p>
           </div>
-          <button class="send-quote" type="button" id="send-quote">Recibir cotización por correo y WhatsApp <span>↗</span></button>
+          <button class="send-quote" type="button" id="send-quote">Enviar cotización por correo</button>
           <p class="response-copy">Te enviaremos el resumen por correo. Un asesor revisará la información contigo y coordinará la visita técnica.</p>
         </aside>
       </section>
@@ -194,6 +197,6 @@
       </article>
     </template>
 
-    <script src="cotizador.js?v=20260908c"></script>
+    <script src="cotizador.js?v=20260908d"></script>
   </body>
 </html>

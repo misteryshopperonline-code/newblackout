@@ -32,6 +32,7 @@ const courtesyStatus = document.querySelector('#courtesy-status');
 const sendButton = document.querySelector('#send-quote');
 const nameInput = document.querySelector('#lead-name');
 const emailInput = document.querySelector('#lead-email');
+const phoneInput = document.querySelector('#lead-phone');
 const formError = document.querySelector('#form-error');
 const otherLocation = document.querySelector('[data-other-location]');
 const locationDetail = document.querySelector('#location-detail');
@@ -107,6 +108,14 @@ function escapeHtml(value) {
   const span = document.createElement('span');
   span.textContent = value;
   return span.innerHTML;
+}
+
+function normalizeEcuadorMobile(value) {
+  return value.replace(/[\s-]/g, '');
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(value);
 }
 
 function updateRuler(input) {
@@ -190,25 +199,6 @@ function selectedLocation() {
   return location;
 }
 
-function buildMessage() {
-  const data = rows().map(rowData);
-  const needs = [...document.querySelectorAll('input[name="needs"]:checked')].map(input => input.value);
-  const quote = calculate(data);
-  const lines = data.map((item, index) => `${index + 1}. ${item.room}: ${item.productLabel}, ${formatNumber(item.width)} m × ${formatNumber(item.height)} m (${formatNumber(item.width * item.height)} m²)`);
-  return [
-    `Hola Blackout, soy ${nameInput.value.trim()}. Quiero cotizar persianas para mi proyecto.`,
-    '',
-    ...lines,
-    '',
-    `Superficie aproximada: ${formatNumber(quote.area)} m²`,
-    `Valor aproximado: ${formatCurrency(quote.low)} – ${formatCurrency(quote.high)}`,
-    `Quiero mejorar: ${needs.length ? needs.join(', ') : 'Necesito recomendación'}`,
-    `Sector: ${selectedLocation()}`,
-    '',
-    'Entiendo que el valor es referencial y debe confirmarse durante la visita técnica. ¿Podrían ayudarme a coordinarla?'
-  ].join('\n');
-}
-
 addButton.addEventListener('click', () => {
   if (rows().length < MAX_WINDOWS) addWindow();
 });
@@ -238,10 +228,17 @@ sendButton.addEventListener('click', async () => {
     return;
   }
   const email = emailInput.value.trim();
-  if (!email || !emailInput.validity.valid) {
+  if (!email || !emailInput.validity.valid || !isValidEmail(email)) {
     emailInput.setAttribute('aria-invalid', 'true');
     formError.textContent = 'Escribe un correo electrónico válido para recibir tu cotización.';
     emailInput.focus();
+    return;
+  }
+  const phone = normalizeEcuadorMobile(phoneInput.value);
+  if (!/^09\d{8}$/.test(phone)) {
+    phoneInput.setAttribute('aria-invalid', 'true');
+    formError.textContent = 'Escribe un celular ecuatoriano válido de 10 dígitos, por ejemplo 0992933619.';
+    phoneInput.focus();
     return;
   }
   const invalidMeasure = rows().flatMap((row) => [row.querySelector('[data-field="width"]'), row.querySelector('[data-field="height"]')]).find((input) => !input.value || Number(input.value) < Number(input.min));
@@ -253,12 +250,14 @@ sendButton.addEventListener('click', async () => {
   }
   nameInput.removeAttribute('aria-invalid');
   emailInput.removeAttribute('aria-invalid');
+  phoneInput.removeAttribute('aria-invalid');
   rows().forEach((row) => row.querySelectorAll('[data-field="width"],[data-field="height"]').forEach((input) => input.removeAttribute('aria-invalid')));
   formError.textContent = '';
   const quote = calculate();
   const request = {
     name,
     email,
+    phone,
     location: selectedLocation(),
     needs: [...document.querySelectorAll('input[name="needs"]:checked')].map((input) => input.value),
     windows: rows().map(rowData),
@@ -276,8 +275,6 @@ sendButton.addEventListener('click', async () => {
   const originalLabel = sendButton.innerHTML;
   sendButton.disabled = true;
   sendButton.textContent = 'Enviando cotización...';
-  const whatsappWindow = window.open('', '_blank');
-  if (whatsappWindow) whatsappWindow.opener = null;
   try {
     const response = await fetch('/.netlify/functions/send-quote', {
       method: 'POST',
@@ -286,16 +283,12 @@ sendButton.addEventListener('click', async () => {
     });
     if (!response.ok) throw new Error('No se pudo enviar la cotización.');
   } catch (error) {
-    formError.textContent = 'No pudimos enviar el correo. Inténtalo nuevamente o contáctanos por WhatsApp.';
-    if (whatsappWindow) whatsappWindow.close();
+    formError.textContent = 'No pudimos enviar el correo. Inténtalo nuevamente.';
     sendButton.disabled = false;
     sendButton.innerHTML = originalLabel;
     return;
   }
-  sendButton.textContent = 'Cotización enviada. Abriendo WhatsApp...';
-  const url = `https://api.whatsapp.com/send?phone=5930992933619&text=${encodeURIComponent(buildMessage())}`;
-  if (whatsappWindow) whatsappWindow.location.href = url;
-  else window.open(url, '_blank', 'noopener,noreferrer');
+  sendButton.textContent = 'Cotización enviada por correo';
 });
 
 nameInput.addEventListener('input', () => {
@@ -306,8 +299,15 @@ nameInput.addEventListener('input', () => {
 });
 
 emailInput.addEventListener('input', () => {
-  if (emailInput.validity.valid) {
+  if (emailInput.validity.valid && isValidEmail(emailInput.value.trim())) {
     emailInput.removeAttribute('aria-invalid');
+    formError.textContent = '';
+  }
+});
+
+phoneInput.addEventListener('input', () => {
+  if (/^09\d{8}$/.test(normalizeEcuadorMobile(phoneInput.value))) {
+    phoneInput.removeAttribute('aria-invalid');
     formError.textContent = '';
   }
 });

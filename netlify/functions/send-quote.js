@@ -1,4 +1,5 @@
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
+const ECUADOR_MOBILE_PATTERN = /^09\d{8}$/;
 const crypto = require('node:crypto');
 const { saveLead } = require('./crm-leads');
 
@@ -24,6 +25,10 @@ function response(statusCode, body) {
   };
 }
 
+function normalizeEcuadorMobile(value) {
+  return typeof value === 'string' ? value.replace(/[\s-]/g, '') : '';
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return response(405, { error: 'Method not allowed.' });
 
@@ -35,9 +40,11 @@ exports.handler = async (event) => {
   }
 
   const { name, email, location, needs, windows, quote } = request;
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  const phone = normalizeEcuadorMobile(request.phone);
   if (
     typeof name !== 'string' || !name.trim() ||
-    typeof email !== 'string' || !EMAIL_PATTERN.test(email) ||
+    !EMAIL_PATTERN.test(normalizedEmail) || !ECUADOR_MOBILE_PATTERN.test(phone) ||
     !Array.isArray(windows) || !windows.length || !quote ||
     !Number.isFinite(quote.low) || !Number.isFinite(quote.high)
   ) {
@@ -63,7 +70,9 @@ exports.handler = async (event) => {
   await saveLead(event, {
     id: crypto.randomUUID(),
     name: name.trim(),
-    email: email.trim(),
+    email: normalizedEmail,
+    phone,
+    notes: [],
     location: typeof location === 'string' ? location : 'Por confirmar',
     needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [],
     windows: windows.map(({ room, productLabel, width, height }) => ({ room, productLabel, width: Number(width), height: Number(height) })),
@@ -117,7 +126,7 @@ exports.handler = async (event) => {
     },
     body: JSON.stringify({
       from: process.env.RESEND_FROM_EMAIL,
-      to: [email.trim()],
+      to: [normalizedEmail],
       subject,
       html,
       text,

@@ -5,6 +5,20 @@
         "gh": true,
         "git add": true,
         "git commit": true,
-        "git push": true
+        "git push": true,
+        "/^node --check cotizador/cotizador\\.js && node --check netlify/functions/send-quote\\.js && node --check netlify/functions/crm-leads\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        ".agents/skills/impeccable/scripts/impeccable": true,
+        "/^node --check crm/crm\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "impeccable": true,
+        "printf": true,
+        "command": true,
+        "true": true,
+        "npx --yes impeccable": true
     }
 }
