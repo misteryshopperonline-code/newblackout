@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { createQuotePdf, handler } = require('../netlify/functions/send-quote');
+const { capitalizeName, createQuotePdf, handler } = require('../netlify/functions/send-quote');
 
 function quote(overrides = {}) {
   return {
@@ -25,6 +25,18 @@ async function assertValidPdf(data) {
 
 test('genera una cotización PDF con el branding de Blackout', async () => {
   await assertValidPdf(quote());
+});
+
+test('normaliza nombres y apellidos a letra capital', () => {
+  assert.equal(capitalizeName(' ana montúfar-de la cruz '), 'Ana Montúfar-De La Cruz');
+});
+
+test('rechaza cotizaciones sin aceptación de términos', async () => {
+  const result = await handler({
+    httpMethod: 'POST',
+    body: JSON.stringify({ ...quote(), email: 'ana@blackout.com.ec', phone: '0992933619' })
+  });
+  assert.equal(result.statusCode, 400);
 });
 
 test('genera una cotización PDF para el máximo de ambientes', async () => {
@@ -55,7 +67,7 @@ test('devuelve un 502 trazable cuando Resend no puede recibir la cotización', a
   try {
     const result = await handler({
       httpMethod: 'POST',
-      body: JSON.stringify({ ...quote(), email: 'ana@blackout.com.ec', phone: '0992933619' })
+      body: JSON.stringify({ ...quote(), email: 'ana@blackout.com.ec', phone: '0992933619', termsAccepted: true })
     });
     const body = JSON.parse(result.body);
     assert.equal(result.statusCode, 502);

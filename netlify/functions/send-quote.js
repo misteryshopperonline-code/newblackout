@@ -30,6 +30,15 @@ function normalizeEcuadorMobile(value) {
   return typeof value === 'string' ? value.replace(/[\s-]/g, '') : '';
 }
 
+function capitalizeName(value) {
+  return value.trim().split(/\s+/).map((word) => word.split('-').map((part) => {
+    const lower = part.toLocaleLowerCase('es-EC');
+    return lower ? `${lower.charAt(0).toLocaleUpperCase('es-EC')}${lower.slice(1)}` : lower;
+  }).join('-')).join(' ');
+}
+
+exports.capitalizeName = capitalizeName;
+
 function createQuotePdf({ name, location, needs, windows, quote }) {
   return new Promise((resolve, reject) => {
     let stage = 'creating-document';
@@ -98,11 +107,12 @@ exports.handler = async (event) => {
     return response(400, { error: 'Invalid request body.' });
   }
 
-  const { name, email, location, needs, windows, quote } = request;
+  const { email, location, needs, windows, quote } = request;
+  const name = typeof request.name === 'string' ? capitalizeName(request.name) : '';
   const normalizedEmail = typeof email === 'string' ? email.trim() : '';
   const phone = normalizeEcuadorMobile(request.phone);
   if (
-    typeof name !== 'string' || !name.trim() ||
+    !name || request.termsAccepted !== true ||
     !EMAIL_PATTERN.test(normalizedEmail) || !ECUADOR_MOBILE_PATTERN.test(phone) ||
     !Array.isArray(windows) || !windows.length || !quote ||
     !Number.isFinite(quote.low) || !Number.isFinite(quote.high)
@@ -220,6 +230,7 @@ exports.handler = async (event) => {
       name: name.trim(),
       email: normalizedEmail,
       phone,
+      termsAccepted: true,
       notes: [],
       location: typeof location === 'string' ? location : 'Por confirmar',
       needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [],

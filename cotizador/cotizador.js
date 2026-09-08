@@ -33,6 +33,7 @@ const sendButton = document.querySelector('#send-quote');
 const nameInput = document.querySelector('#lead-name');
 const emailInput = document.querySelector('#lead-email');
 const phoneInput = document.querySelector('#lead-phone');
+const consentInput = document.querySelector('#lead-consent');
 const formError = document.querySelector('#form-error');
 const otherLocation = document.querySelector('[data-other-location]');
 const locationDetail = document.querySelector('#location-detail');
@@ -112,6 +113,13 @@ function escapeHtml(value) {
 
 function normalizeEcuadorMobile(value) {
   return value.replace(/[\s-]/g, '');
+}
+
+function capitalizeName(value) {
+  return value.trim().split(/\s+/).map((word) => word.split('-').map((part) => {
+    const lower = part.toLocaleLowerCase('es-EC');
+    return lower ? `${lower.charAt(0).toLocaleUpperCase('es-EC')}${lower.slice(1)}` : lower;
+  }).join('-')).join(' ');
 }
 
 function isValidEmail(value) {
@@ -220,7 +228,7 @@ list.addEventListener('input', (event) => {
 });
 
 sendButton.addEventListener('click', async () => {
-  const name = nameInput.value.trim();
+  const name = capitalizeName(nameInput.value);
   if (!name) {
     nameInput.setAttribute('aria-invalid', 'true');
     formError.textContent = 'Escribe tu nombre para que podamos identificar tu solicitud.';
@@ -241,6 +249,11 @@ sendButton.addEventListener('click', async () => {
     phoneInput.focus();
     return;
   }
+  if (!consentInput.checked) {
+    formError.textContent = 'Acepta el uso de tus datos para gestionar la cotización y suscribirte al newsletter.';
+    consentInput.focus();
+    return;
+  }
   const invalidMeasure = rows().flatMap((row) => [row.querySelector('[data-field="width"]'), row.querySelector('[data-field="height"]')]).find((input) => !input.value || Number(input.value) < Number(input.min));
   if (invalidMeasure) {
     invalidMeasure.setAttribute('aria-invalid', 'true');
@@ -258,6 +271,7 @@ sendButton.addEventListener('click', async () => {
     name,
     email,
     phone,
+    termsAccepted: true,
     location: selectedLocation(),
     needs: [...document.querySelectorAll('input[name="needs"]:checked')].map((input) => input.value),
     windows: rows().map(rowData),
@@ -291,7 +305,7 @@ sendButton.addEventListener('click', async () => {
     sendButton.innerHTML = originalLabel;
     return;
   }
-  sendButton.textContent = 'Cotización enviada por correo';
+  window.location.assign('confirmacion.html');
 });
 
 nameInput.addEventListener('input', () => {
@@ -299,6 +313,10 @@ nameInput.addEventListener('input', () => {
     nameInput.removeAttribute('aria-invalid');
     formError.textContent = '';
   }
+});
+
+nameInput.addEventListener('blur', () => {
+  nameInput.value = capitalizeName(nameInput.value);
 });
 
 emailInput.addEventListener('input', () => {

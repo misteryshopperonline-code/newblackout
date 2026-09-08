@@ -137,6 +137,10 @@
               <label for="lead-phone">Tu celular</label>
               <input id="lead-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="0992933619" pattern="09[0-9]{8}" maxlength="10" aria-describedby="lead-phone-help" />
               <small id="lead-phone-help">Ingresa tu número celular ecuatoriano de 10 dígitos.</small>
+              <label class="consent-field" for="lead-consent">
+                <input id="lead-consent" name="termsAccepted" type="checkbox" />
+                <span>Acepto que mis datos sean utilizados para gestionar esta cotización y suscribirme al newsletter de Blackout.</span>
+              </label>
             <p class="field-error" id="form-error" aria-live="polite"></p>
           </div>
           <button class="send-quote" type="button" id="send-quote">Enviar cotización por correo</button>
@@ -197,6 +201,6 @@
       </article>
     </template>
 
-    <script src="cotizador.js?v=20260908d"></script>
+    <script src="cotizador.js?v=20260908e"></script>
   </body>
 </html>
