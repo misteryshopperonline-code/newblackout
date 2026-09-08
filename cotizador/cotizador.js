@@ -31,6 +31,7 @@ const measureWarning = document.querySelector('#measure-warning');
 const courtesyStatus = document.querySelector('#courtesy-status');
 const sendButton = document.querySelector('#send-quote');
 const nameInput = document.querySelector('#lead-name');
+const emailInput = document.querySelector('#lead-email');
 const formError = document.querySelector('#form-error');
 const otherLocation = document.querySelector('[data-other-location]');
 const locationDetail = document.querySelector('#location-detail');
@@ -228,12 +229,19 @@ list.addEventListener('input', (event) => {
   if (event.target === activeWidthInput || event.target.matches('[data-field="room"]') && event.target.closest('.window-row') === activeWidthInput?.closest('.window-row')) updateRuler(activeWidthInput);
 });
 
-sendButton.addEventListener('click', () => {
+sendButton.addEventListener('click', async () => {
   const name = nameInput.value.trim();
   if (!name) {
     nameInput.setAttribute('aria-invalid', 'true');
     formError.textContent = 'Escribe tu nombre para que podamos identificar tu solicitud.';
     nameInput.focus();
+    return;
+  }
+  const email = emailInput.value.trim();
+  if (!email || !emailInput.validity.valid) {
+    emailInput.setAttribute('aria-invalid', 'true');
+    formError.textContent = 'Escribe un correo electrónico válido para recibir tu cotización.';
+    emailInput.focus();
     return;
   }
   const invalidMeasure = rows().flatMap((row) => [row.querySelector('[data-field="width"]'), row.querySelector('[data-field="height"]')]).find((input) => !input.value || Number(input.value) < Number(input.min));
@@ -244,15 +252,62 @@ sendButton.addEventListener('click', () => {
     return;
   }
   nameInput.removeAttribute('aria-invalid');
+  emailInput.removeAttribute('aria-invalid');
   rows().forEach((row) => row.querySelectorAll('[data-field="width"],[data-field="height"]').forEach((input) => input.removeAttribute('aria-invalid')));
   formError.textContent = '';
+  const quote = calculate();
+  const request = {
+    name,
+    email,
+    location: selectedLocation(),
+    needs: [...document.querySelectorAll('input[name="needs"]:checked')].map((input) => input.value),
+    windows: rows().map(rowData),
+    quote: {
+      area: quote.area,
+      low: quote.low,
+      high: quote.high,
+      subtotal: quote.subtotal,
+      discount: quote.discount,
+      installation: quote.installation,
+      tax: quote.tax,
+      total: quote.total
+    }
+  };
+  const originalLabel = sendButton.innerHTML;
+  sendButton.disabled = true;
+  sendButton.textContent = 'Enviando cotización...';
+  const whatsappWindow = window.open('', '_blank');
+  if (whatsappWindow) whatsappWindow.opener = null;
+  try {
+    const response = await fetch('/.netlify/functions/send-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    if (!response.ok) throw new Error('No se pudo enviar la cotización.');
+  } catch (error) {
+    formError.textContent = 'No pudimos enviar el correo. Inténtalo nuevamente o contáctanos por WhatsApp.';
+    if (whatsappWindow) whatsappWindow.close();
+    sendButton.disabled = false;
+    sendButton.innerHTML = originalLabel;
+    return;
+  }
+  sendButton.textContent = 'Cotización enviada. Abriendo WhatsApp...';
   const url = `https://api.whatsapp.com/send?phone=5930992933619&text=${encodeURIComponent(buildMessage())}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  if (whatsappWindow) whatsappWindow.location.href = url;
+  else window.open(url, '_blank', 'noopener,noreferrer');
 });
 
 nameInput.addEventListener('input', () => {
   if (nameInput.value.trim()) {
     nameInput.removeAttribute('aria-invalid');
+    formError.textContent = '';
+  }
+});
+
+emailInput.addEventListener('input', () => {
+  if (emailInput.validity.valid) {
+    emailInput.removeAttribute('aria-invalid');
     formError.textContent = '';
   }
 });

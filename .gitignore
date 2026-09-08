@@ -1,2 +1,9 @@
 # Local visual-inspection artifacts
 blackout-*.png
+# Local Netlify folder
+.netlify
+.env
+.env.*
+!.env.example
+node_modules/
+.env.example

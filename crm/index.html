@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>CRM | Blackout Window Coverings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="crm.css" />
+  </head>
+  <body>
+    <main id="app" class="app-shell" aria-live="polite"></main>
+    <template id="login-view">
+      <section class="login-view" aria-labelledby="login-title">
+        <form class="login-panel" id="login-form">
+          <div class="brand-mark" aria-hidden="true">B</div>
+          <p class="product-name">BLACKOUT WINDOW COVERINGS</p>
+          <h1 id="login-title">Seguimiento comercial</h1>
+          <p>Acceso exclusivo para el equipo autorizado.</p>
+          <label for="username">Correo de acceso</label>
+          <input id="username" name="username" type="email" autocomplete="username" required />
+          <label for="password">Contraseña</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+          <p class="form-error" id="login-error" aria-live="polite"></p>
+          <button type="submit">Ingresar</button>
+        </form>
+      </section>
+    </template>
+    <template id="crm-view">
+      <section class="crm-shell">
+        <header class="crm-header">
+          <div><span class="brand-mark" aria-hidden="true">B</span><strong>BLACKOUT</strong><small>CRM COMERCIAL</small></div>
+          <div class="user-menu"><span id="active-user"></span><button type="button" id="logout">Salir</button></div>
+        </header>
+        <div class="crm-content">
+          <section class="pipeline-heading"><div><h1>Prospectos</h1><p>Solicitudes recibidas desde el cotizador.</p></div><p class="lead-count" id="lead-count"></p></section>
+          <section class="pipeline" aria-label="Prospectos por etapa">
+            <div class="lead-list" id="lead-list"></div>
+            <aside class="lead-detail" id="lead-detail"><p>Selecciona un prospecto para ver su cotización.</p></aside>
+          </section>
+        </div>
+      </section>
+    </template>
+    <script src="crm.js"></script>
+  </body>
+</html>
