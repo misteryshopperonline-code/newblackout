@@ -1,6 +1,12 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["pdfkit"]
+  included_files = ["node_modules/pdfkit/js/standard-fonts/**", "node_modules/pdfkit/js/data/**"]
+
 [[headers]]
   for = "/*"
   [headers.values]

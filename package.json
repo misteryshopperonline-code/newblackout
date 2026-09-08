@@ -1,7 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test"
+    "test": "node --test test/*.test.js",
+    "dev:cotizador": "npm --prefix apps/cotizador run dev",
+    "build:cotizador": "npm --prefix apps/cotizador run build",
+    "check:cotizador": "npm --prefix apps/cotizador run check"
   },
   "dependencies": {
     "@netlify/blobs": "^8.1.0",

@@ -8,3 +8,4 @@ blackout-*.png
 node_modules/
 .env.example
 .vscode/settings.json
+!apps/cotizador/.env.example

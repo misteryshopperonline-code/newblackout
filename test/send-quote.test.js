@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { createQuotePdf } = require('../netlify/functions/send-quote');
 
@@ -33,4 +35,11 @@ test('genera una cotización PDF para el máximo de ambientes', async () => {
     height: 2.3
   }));
   await assertValidPdf(quote({ windows, quote: { area: 46, low: 1790, high: 2010 } }));
+});
+
+test('Netlify incluye las fuentes dinámicas de PDFKit en las funciones', () => {
+  const config = fs.readFileSync(path.join(__dirname, '..', 'netlify.toml'), 'utf8');
+  assert.match(config, /external_node_modules\s*=\s*\["pdfkit"\]/);
+  assert.match(config, /node_modules\/pdfkit\/js\/standard-fonts\/\*\*/);
+  assert.match(config, /node_modules\/pdfkit\/js\/data\/\*\*/);
 });

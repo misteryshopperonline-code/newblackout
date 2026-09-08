@@ -32,47 +32,56 @@ function normalizeEcuadorMobile(value) {
 
 function createQuotePdf({ name, location, needs, windows, quote }) {
   return new Promise((resolve, reject) => {
-    const document = new PDFDocument({ size: 'A4', margin: 52, info: { Title: 'Cotización referencial Blackout', Author: 'Blackout Window Coverings' } });
-    const chunks = [];
-    document.on('data', (chunk) => chunks.push(chunk));
-    document.on('end', () => resolve(Buffer.concat(chunks)));
-    document.on('error', reject);
+    let stage = 'creating-document';
+    try {
+      const document = new PDFDocument({ size: 'A4', margin: 52, info: { Title: 'Cotización referencial Blackout', Author: 'Blackout Window Coverings' } });
+      const chunks = [];
+      document.on('data', (chunk) => chunks.push(chunk));
+      document.on('end', () => resolve(Buffer.concat(chunks)));
+      document.on('error', (error) => reject(Object.assign(error, { quotePdfStage: stage })));
 
-    document.rect(0, 0, document.page.width, 112).fill('#2a202d');
-    document.fillColor('#c8a7d3').font('Times-Bold').fontSize(30).text('B', 52, 36);
-    document.fillColor('#ffffff').font('Helvetica-Bold').fontSize(13).text('BLACKOUT', 88, 41);
-    document.fillColor('#d9cedd').font('Helvetica').fontSize(8).text('WINDOW COVERINGS', 89, 59);
-    document.fillColor('#2a202d').font('Times-Bold').fontSize(30).text('Cotización referencial', 52, 148);
-    document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`Preparada para ${name}`, 52, 190);
-    document.text(`Sector: ${location}`, 52, 207);
-    document.fillColor('#69447d').font('Helvetica-Bold').fontSize(11).text('VALOR APROXIMADO', 52, 250);
-    document.fillColor('#2a202d').font('Times-Bold').fontSize(26).text(`${formatCurrency(quote.low)} - ${formatCurrency(quote.high)}`, 52, 270);
-    document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`${formatNumber(quote.area)} m2 aproximados`, 52, 306);
-    document.moveTo(52, 335).lineTo(543, 335).strokeColor('#ded9df').stroke();
-    document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Ambientes cotizados', 52, 358);
-    let y = 387;
-    windows.forEach((window) => {
-      if (y > 680) {
+      stage = 'rendering-header';
+      document.rect(0, 0, document.page.width, 112).fill('#2a202d');
+      document.fillColor('#c8a7d3').font('Times-Bold').fontSize(30).text('B', 52, 36);
+      document.fillColor('#ffffff').font('Helvetica-Bold').fontSize(13).text('BLACKOUT', 88, 41);
+      document.fillColor('#d9cedd').font('Helvetica').fontSize(8).text('WINDOW COVERINGS', 89, 59);
+      document.fillColor('#2a202d').font('Times-Bold').fontSize(30).text('Cotización referencial', 52, 148);
+      document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`Preparada para ${name}`, 52, 190);
+      document.text(`Sector: ${location}`, 52, 207);
+      document.fillColor('#69447d').font('Helvetica-Bold').fontSize(11).text('VALOR APROXIMADO', 52, 250);
+      document.fillColor('#2a202d').font('Times-Bold').fontSize(26).text(`${formatCurrency(quote.low)} - ${formatCurrency(quote.high)}`, 52, 270);
+      document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`${formatNumber(quote.area)} m2 aproximados`, 52, 306);
+      document.moveTo(52, 335).lineTo(543, 335).strokeColor('#ded9df').stroke();
+      document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Ambientes cotizados', 52, 358);
+      let y = 387;
+      stage = 'rendering-windows';
+      windows.forEach((window) => {
+        if (y > 680) {
+          document.addPage();
+          document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Ambientes cotizados', 52, 52);
+          y = 81;
+        }
+        const width = Number(window.width);
+        const height = Number(window.height);
+        document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(10).text(window.room || 'Ambiente sin nombre', 52, y);
+        document.fillColor('#6c6670').font('Helvetica').fontSize(9).text(`${window.productLabel || 'Persiana'} · ${formatNumber(width)} m x ${formatNumber(height)} m`, 52, y + 15);
+        document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(9).text(`${formatNumber(width * height)} m2`, 465, y + 7, { width: 78, align: 'right' });
+        y += 47;
+      });
+      if (y > 640) {
         document.addPage();
-        document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Ambientes cotizados', 52, 52);
-        y = 81;
+        y = 52;
       }
-      const width = Number(window.width);
-      const height = Number(window.height);
-      document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(10).text(window.room || 'Ambiente sin nombre', 52, y);
-      document.fillColor('#6c6670').font('Helvetica').fontSize(9).text(`${window.productLabel || 'Persiana'} · ${formatNumber(width)} m x ${formatNumber(height)} m`, 52, y + 15);
-      document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(9).text(`${formatNumber(width * height)} m2`, 465, y + 7, { width: 78, align: 'right' });
-      y += 47;
-    });
-    if (y > 640) {
-      document.addPage();
-      y = 52;
+      stage = 'rendering-summary';
+      document.moveTo(52, y).lineTo(543, y).strokeColor('#ded9df').stroke();
+      document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Necesidades del proyecto', 52, y + 23);
+      document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(needs.length ? needs.join(', ') : 'Necesita recomendación', 52, y + 43, { width: 490 });
+      document.fillColor('#6c6670').font('Helvetica').fontSize(8).text('Este valor es referencial. Confirmaremos tejido, mecanismo, acabados, instalación y precio final durante la visita técnica.', 52, 742, { width: 490, align: 'center' });
+      stage = 'finalizing-document';
+      document.end();
+    } catch (error) {
+      reject(Object.assign(error, { quotePdfStage: stage }));
     }
-    document.moveTo(52, y).lineTo(543, y).strokeColor('#ded9df').stroke();
-    document.fillColor('#2a202d').font('Helvetica-Bold').fontSize(12).text('Necesidades del proyecto', 52, y + 23);
-    document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(needs.length ? needs.join(', ') : 'Necesita recomendación', 52, y + 43, { width: 490 });
-    document.fillColor('#6c6670').font('Helvetica').fontSize(8).text('Este valor es referencial. Confirmaremos tejido, mecanismo, acabados, instalación y precio final durante la visita técnica.', 52, 742, { width: 490, align: 'center' });
-    document.end();
   });
 }
 
@@ -120,9 +129,19 @@ exports.handler = async (event) => {
   try {
     quotePdf = await createQuotePdf({ name: name.trim(), location: typeof location === 'string' ? location : 'Por confirmar', needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [], windows: validWindows, quote });
   } catch (error) {
-    console.error('Unable to generate quote PDF:', error);
+    console.error('Quote PDF generation failed:', JSON.stringify({
+      stage: error.quotePdfStage || 'unknown',
+      errorName: error.name,
+      errorMessage: error.message,
+      stack: error.stack,
+      nodeVersion: process.version,
+      pdfkitVersion: require('pdfkit/package.json').version,
+      windowCount: validWindows.length,
+      quote: { area: quote.area, low: quote.low, high: quote.high }
+    }));
     return response(500, { error: 'No pudimos generar el PDF de tu cotización.' });
   }
+  console.info('Quote PDF generated:', JSON.stringify({ bytes: quotePdf.length, windowCount: validWindows.length, nodeVersion: process.version, pdfkitVersion: require('pdfkit/package.json').version }));
 
   const cleanName = escapeHtml(name.trim());
   const cleanLocation = escapeHtml(typeof location === 'string' ? location : 'Por confirmar');
