@@ -40,8 +40,9 @@ function renderDashboard() {
   renderDetail();
 }
 
-function renderLogin() {
+function renderLogin(message = '') {
   app.replaceChildren(document.querySelector('#login-view').content.cloneNode(true));
+  document.querySelector('#login-error').textContent = message;
   document.querySelector('#login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -51,7 +52,7 @@ function renderLogin() {
 }
 
 async function loadDashboard() {
-  try { leads = (await request('/.netlify/functions/crm-leads')).leads; selectedLeadId = leads[0]?.id || null; renderDashboard(); } catch { renderLogin(); }
+  try { leads = (await request('/.netlify/functions/crm-leads')).leads; selectedLeadId = leads[0]?.id || null; renderDashboard(); } catch (error) { renderLogin(error.message); }
 }
 
 (async () => { try { const session = await request('/.netlify/functions/crm-auth'); if (!session.authenticated) return renderLogin(); window.crmUser = session.user; await loadDashboard(); } catch { renderLogin(); } })();
