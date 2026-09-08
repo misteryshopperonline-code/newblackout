@@ -21,6 +21,34 @@ function normalizeEcuadorMobile(value) {
   return typeof value === 'string' ? value.replace(/[\s-]/g, '') : '';
 }
 
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLocaleLowerCase('es-EC') : '';
+}
+
+function getDuplicateMatches(leads) {
+  return leads.map((lead) => {
+    const email = normalizeEmail(lead.email);
+    const phone = normalizeEcuadorMobile(lead.phone);
+    const duplicateMatches = leads
+      .filter((candidate) => candidate.id !== lead.id)
+      .filter((candidate) => {
+        const sameEmail = email && normalizeEmail(candidate.email) === email;
+        const samePhone = phone && normalizeEcuadorMobile(candidate.phone) === phone;
+        return sameEmail || samePhone;
+      })
+      .map((candidate) => ({
+        id: candidate.id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone,
+        createdAt: candidate.createdAt
+      }));
+    return { ...lead, duplicateMatches };
+  });
+}
+
+exports.getDuplicateMatches = getDuplicateMatches;
+
 exports.saveLead = async (event, lead) => {
   configureBlobs(event);
   const store = getStore('prospects');
@@ -33,7 +61,7 @@ exports.handler = async (event) => {
   if (!session) return response(401, { error: 'Unauthorized.' });
   try {
     configureBlobs(event);
-    if (event.httpMethod === 'GET') return response(200, { leads: await getLeads() });
+    if (event.httpMethod === 'GET') return response(200, { leads: getDuplicateMatches(await getLeads()) });
     if (event.httpMethod === 'DELETE') {
       let request;
       try {
@@ -84,7 +112,7 @@ exports.handler = async (event) => {
     });
     if (!updatedLead) return response(404, { error: 'Lead not found.' });
     await store.setJSON('leads', updated);
-    return response(200, { lead: updatedLead });
+    return response(200, { lead: getDuplicateMatches(updated).find((lead) => lead.id === updatedLead.id) });
   } catch (error) {
     console.error('Unable to access the prospects store:', error);
     return response(503, { error: 'El CRM no puede acceder a los prospectos. Revisa Netlify Blobs y vuelve a intentarlo.' });
