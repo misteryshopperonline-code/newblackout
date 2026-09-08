@@ -2,7 +2,16 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const ECUADOR_MOBILE_PATTERN = /^09\d{8}$/;
 const crypto = require('node:crypto');
 const PDFDocument = require('pdfkit');
+const { connectLambda, getStore } = require('@netlify/blobs');
 const { saveLead } = require('./crm-leads');
+
+function generateQuoteNumber() {
+  const year = new Date().getFullYear();
+  const random = crypto.randomInt(100000, 999999);
+  return `COT-${year}-${random}`;
+}
+
+exports.generateQuoteNumber = generateQuoteNumber;
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(value);
@@ -39,7 +48,7 @@ function capitalizeName(value) {
 
 exports.capitalizeName = capitalizeName;
 
-function createQuotePdf({ name, location, needs, windows, quote }) {
+function createQuotePdf({ name, location, needs, windows, quote, quoteNumber }) {
   return new Promise((resolve, reject) => {
     let stage = 'creating-document';
     try {
@@ -57,6 +66,7 @@ function createQuotePdf({ name, location, needs, windows, quote }) {
       document.fillColor('#2a202d').font('Times-Bold').fontSize(30).text('Cotización referencial', 52, 148);
       document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`Preparada para ${name}`, 52, 190);
       document.text(`Sector: ${location}`, 52, 207);
+      if (quoteNumber) document.fillColor('#69447d').font('Helvetica-Bold').fontSize(9).text(`N° de cotización: ${quoteNumber}`, 52, 224);
       document.fillColor('#69447d').font('Helvetica-Bold').fontSize(11).text('VALOR APROXIMADO', 52, 250);
       document.fillColor('#2a202d').font('Times-Bold').fontSize(26).text(`${formatCurrency(quote.low)} - ${formatCurrency(quote.high)}`, 52, 270);
       document.fillColor('#6c6670').font('Helvetica').fontSize(10).text(`${formatNumber(quote.area)} m2 aproximados`, 52, 306);
@@ -136,9 +146,11 @@ exports.handler = async (event) => {
 
   if (!validWindows.length) return response(400, { error: 'Invalid window details.' });
   const windowRows = validWindows.map((window) => `<tr><td>${window.room}</td><td>${window.product}</td><td>${formatNumber(window.width)} m x ${formatNumber(window.height)} m</td><td>${formatNumber(window.width * window.height)} m2</td></tr>`);
+  const leadId = crypto.randomUUID();
+  const quoteNumber = generateQuoteNumber();
   let quotePdf;
   try {
-    quotePdf = await createQuotePdf({ name: name.trim(), location: typeof location === 'string' ? location : 'Por confirmar', needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [], windows: validWindows, quote });
+    quotePdf = await createQuotePdf({ name: name.trim(), location: typeof location === 'string' ? location : 'Por confirmar', needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [], windows: validWindows, quote, quoteNumber });
   } catch (error) {
     console.error('Quote PDF generation failed:', JSON.stringify({
       stage: error.quotePdfStage || 'unknown',
@@ -158,11 +170,12 @@ exports.handler = async (event) => {
   const cleanNeeds = Array.isArray(needs) && needs.length
     ? needs.map(escapeHtml).join(', ')
     : 'Necesito recomendación';
-  const subject = `Tu cotización referencial Blackout, ${name.trim()}`;
+  const subject = `Tu cotización referencial Blackout Nº ${quoteNumber}`;
   const text = [
     `Hola ${name.trim()},`,
     '',
     'Gracias por compartir los datos de tu proyecto con Blackout Window Coverings.',
+    `Número de cotización: ${quoteNumber} (guárdalo para dar seguimiento).`,
     `Valor aproximado: ${formatCurrency(quote.low)} - ${formatCurrency(quote.high)}.`,
     `Superficie aproximada: ${formatNumber(quote.area)} m2.`,
     `Sector: ${location || 'Por confirmar'}.`,
@@ -177,6 +190,7 @@ exports.handler = async (event) => {
       <div style="padding:28px">
       <h1 style="font-size:26px;font-weight:600">Hola ${cleanName}</h1>
       <p>Gracias por compartir los datos de tu proyecto con Blackout Window Coverings.</p>
+      <p style="color:#6c6670;font-size:13px">Número de cotización: <strong>${quoteNumber}</strong> · guárdalo para dar seguimiento.</p>
       <div style="padding:20px;background:#f5f2f7;border-left:1px solid #6e3a86">
         <strong>Valor aproximado</strong><br />
         <span style="font-size:24px">${formatCurrency(quote.low)} - ${formatCurrency(quote.high)}</span><br />
@@ -225,8 +239,26 @@ exports.handler = async (event) => {
   }
 
   try {
+    let quoteFile = null;
+    try {
+      if (event.blobs) connectLambda(event);
+      const fileKey = `${leadId}/${crypto.randomUUID()}`;
+      await getStore('lead-files').set(fileKey, quotePdf, { metadata: { contentType: 'application/pdf' } });
+      quoteFile = {
+        id: crypto.randomUUID(),
+        key: fileKey,
+        category: 'cotizacion_original',
+        name: `cotizacion-${quoteNumber}.pdf`,
+        contentType: 'application/pdf',
+        size: quotePdf.length,
+        uploadedBy: 'Sistema',
+        uploadedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('No pudimos adjuntar la cotización PDF al CRM:', JSON.stringify({ requestId, errorMessage: error.message }));
+    }
     await saveLead(event, {
-      id: crypto.randomUUID(),
+      id: leadId,
       name: name.trim(),
       email: normalizedEmail,
       phone,
@@ -236,6 +268,8 @@ exports.handler = async (event) => {
       needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [],
       windows: validWindows.map(({ room, productLabel, width, height }) => ({ room, productLabel, width, height })),
       quote: { area: Number(quote.area), low: Number(quote.low), high: Number(quote.high) },
+      quoteNumber,
+      files: quoteFile ? [quoteFile] : [],
       status: 'Nuevo',
       createdAt: new Date().toISOString()
     });
