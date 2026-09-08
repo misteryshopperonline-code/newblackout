@@ -281,9 +281,12 @@ sendButton.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     });
-    if (!response.ok) throw new Error('No se pudo enviar la cotización.');
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'No se pudo enviar la cotización.');
+    }
   } catch (error) {
-    formError.textContent = 'No pudimos enviar el correo. Inténtalo nuevamente.';
+    formError.textContent = error.message || 'No pudimos enviar el correo. Inténtalo nuevamente.';
     sendButton.disabled = false;
     sendButton.innerHTML = originalLabel;
     return;

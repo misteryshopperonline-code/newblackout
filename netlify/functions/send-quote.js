@@ -116,21 +116,13 @@ exports.handler = async (event) => {
 
   if (!validWindows.length) return response(400, { error: 'Invalid window details.' });
   const windowRows = validWindows.map((window) => `<tr><td>${window.room}</td><td>${window.product}</td><td>${formatNumber(window.width)} m x ${formatNumber(window.height)} m</td><td>${formatNumber(window.width * window.height)} m2</td></tr>`);
-  const quotePdf = await createQuotePdf({ name: name.trim(), location: typeof location === 'string' ? location : 'Por confirmar', needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [], windows: validWindows, quote });
-
-  await saveLead(event, {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    email: normalizedEmail,
-    phone,
-    notes: [],
-    location: typeof location === 'string' ? location : 'Por confirmar',
-    needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [],
-    windows: validWindows.map(({ room, productLabel, width, height }) => ({ room, productLabel, width, height })),
-    quote: { area: Number(quote.area), low: Number(quote.low), high: Number(quote.high) },
-    status: 'Nuevo',
-    createdAt: new Date().toISOString()
-  });
+  let quotePdf;
+  try {
+    quotePdf = await createQuotePdf({ name: name.trim(), location: typeof location === 'string' ? location : 'Por confirmar', needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [], windows: validWindows, quote });
+  } catch (error) {
+    console.error('Unable to generate quote PDF:', error);
+    return response(500, { error: 'No pudimos generar el PDF de tu cotización.' });
+  }
 
   const cleanName = escapeHtml(name.trim());
   const cleanLocation = escapeHtml(typeof location === 'string' ? location : 'Por confirmar');
@@ -191,8 +183,27 @@ exports.handler = async (event) => {
   });
 
   if (!resendResponse.ok) {
-    console.error('Resend rejected quote email:', await resendResponse.text());
-    return response(502, { error: 'Unable to send quote email.' });
+    const resendError = await resendResponse.text();
+    console.error('Resend rejected quote email:', resendResponse.status, resendError);
+    return response(502, { error: 'No pudimos enviar la cotización. Inténtalo nuevamente.' });
+  }
+
+  try {
+    await saveLead(event, {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      email: normalizedEmail,
+      phone,
+      notes: [],
+      location: typeof location === 'string' ? location : 'Por confirmar',
+      needs: Array.isArray(needs) ? needs.filter((need) => typeof need === 'string') : [],
+      windows: validWindows.map(({ room, productLabel, width, height }) => ({ room, productLabel, width, height })),
+      quote: { area: Number(quote.area), low: Number(quote.low), high: Number(quote.high) },
+      status: 'Nuevo',
+      createdAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Quote email sent but prospect could not be saved:', error);
   }
 
   return response(200, { success: true });
