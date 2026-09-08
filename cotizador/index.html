@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Prepara tu cotización de persianas a medida en Quito y Cumbayá. Añade ambientes, medidas y necesidades para recibir asesoría de Blackout." />
+    <link rel="canonical" href="https://blackout.com.ec/cotizador/" />
+    <title>Cotizador de persianas a medida | Blackout Ecuador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="cotizador.css?v=20260908c" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Cotizador de persianas Blackout",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://blackout.com.ec/cotizador/",
+        "description": "Herramienta para preparar una solicitud de cotización de persianas a medida en Quito y Cumbayá.",
+        "provider": {"@type": "Organization", "name": "Blackout Window Coverings", "url": "https://blackout.com.ec/"}
+      }
+    </script>
+  </head>
+  <body>
+    <header class="nav quote-nav scrolled" data-header>
+      <a class="brand" href="../" aria-label="Blackout, inicio">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M8 4h10c8 0 12 3 12 9 0 4-2 7-6 8 6 1 9 4 9 9 0 7-5 10-14 10H8V4Zm8 7v7h2c3 0 5-1 5-4 0-2-2-3-5-3h-2Zm0 14v8h3c4 0 6-1 6-4 0-3-2-4-6-4h-3Z"/><path d="M34 4h3v36h-3z" opacity=".38"/></svg>
+        <span>BLACKOUT<small>WINDOW COVERINGS</small></span>
+      </a>
+      <nav id="mobile-navigation" aria-label="Principal">
+        <a href="../#soluciones">Soluciones</a>
+        <a href="../#proyectos">Proyectos</a>
+        <a href="../blog/">Blog</a>
+        <a href="./" aria-current="page">Cotizador</a>
+      </nav>
+      <a class="nav-cta" href="https://api.whatsapp.com/send?phone=5930992933619&text=Hola%20Blackout%2C%20quiero%20asesor%C3%ADa%20para%20mis%20persianas" target="_blank" rel="noreferrer">Hablar con un asesor <span>↗</span></a>
+      <button class="menu" type="button" aria-label="Abrir menú" aria-controls="mobile-navigation" aria-expanded="false"><span></span><span></span></button>
+    </header>
+
+    <main class="quote-page">
+      <section class="quote-intro">
+        <div>
+          <h1>Tu proyecto empieza con una buena medida.</h1>
+        </div>
+        <p>Organiza las ventanas de tu espacio, define qué necesitas y envía el resumen a nuestro equipo. Confirmaremos materiales, instalación y precio durante la asesoría.</p>
+      </section>
+
+      <section class="quote-workspace" aria-label="Cotizador">
+        <form class="quote-form" id="quote-form" novalidate>
+          <div class="form-heading">
+            <div>
+              <span>01</span>
+              <h2>Cuéntanos sobre tus ventanas</h2>
+            </div>
+            <p>Las medidas pueden ser aproximadas. Nuestro equipo realizará la medición técnica antes de fabricar.</p>
+          </div>
+
+          <div class="measurement-ruler" aria-label="Regla visual de referencia para el ancho seleccionado">
+            <div class="ruler-heading">
+              <span>Referencia de ancho</span>
+              <strong data-ruler-value aria-live="polite">Sala principal · 2,00 m</strong>
+            </div>
+            <div class="ruler-bed">
+              <div class="ruler-indicator" data-ruler-indicator aria-hidden="true"></div>
+              <div class="ruler-ticks" aria-hidden="true">
+                <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>250</span><span>300 cm</span>
+              </div>
+            </div>
+            <p>Selecciona el campo “Ancho” de cualquier ambiente para visualizar su medida sobre la regla.</p>
+          </div>
+
+          <div class="window-list" id="window-list" aria-live="polite"></div>
+          <button class="add-window" type="button" id="add-window">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Agregar otro ambiente
+          </button>
+
+          <fieldset class="needs-fieldset">
+            <legend><span>02</span> ¿Qué quieres mejorar?</legend>
+            <p>Selecciona todas las opciones que apliquen.</p>
+            <div class="need-options">
+              <label><input type="checkbox" name="needs" value="Controlar la entrada de luz" checked /><span>Controlar la luz</span></label>
+              <label><input type="checkbox" name="needs" value="Mejorar la privacidad" /><span>Más privacidad</span></label>
+              <label><input type="checkbox" name="needs" value="Reducir el calor" /><span>Reducir el calor</span></label>
+              <label><input type="checkbox" name="needs" value="Renovar la estética" /><span>Renovar el ambiente</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="location-fieldset">
+            <legend><span>03</span> ¿Dónde instalaremos?</legend>
+            <div class="location-options">
+              <label><input type="radio" name="location" value="Quito" checked /><span>Quito</span></label>
+              <label><input type="radio" name="location" value="Cumbayá" /><span>Cumbayá</span></label>
+              <label><input type="radio" name="location" value="Otro sector" /><span>Otro sector</span></label>
+            </div>
+            <div class="other-location" data-other-location hidden>
+              <label for="location-detail">Ciudad o sector</label>
+              <input id="location-detail" type="text" autocomplete="address-level2" placeholder="Ej. Tumbaco" />
+              <label for="distance-km">Distancia adicional aproximada <small>km</small></label>
+              <input id="distance-km" type="number" min="0" step="1" inputmode="numeric" value="10" />
+            </div>
+          </fieldset>
+        </form>
+
+        <aside class="quote-summary" aria-labelledby="summary-title">
+          <div class="summary-topline"><span>Resumen del proyecto</span><strong id="window-count">1 ambiente</strong></div>
+          <h2 id="summary-title">Una primera lectura de tu espacio.</h2>
+          <div class="area-display"><strong id="total-area">4,40</strong><span>m² aproximados</span></div>
+          <div class="estimate-display" aria-live="polite">
+            <span>Valor aproximado</span>
+            <strong id="estimate-range">$0 – $0</strong>
+            <p>Rango referencial de ±6% calculado con las tarifas proporcionadas.</p>
+          </div>
+          <div class="summary-lines" id="summary-lines"></div>
+          <p class="measure-warning" id="measure-warning" hidden></p>
+          <details class="price-breakdown">
+            <summary>Ver desglose del cálculo</summary>
+            <div><span>Productos</span><strong id="price-subtotal">$0,00</strong></div>
+            <div><span>Descuento aplicado (40%)</span><strong id="price-discount">−$0,00</strong></div>
+            <div><span>Instalación</span><strong id="price-installation">$0,00</strong></div>
+            <div><span>IVA (15%)</span><strong id="price-tax">$0,00</strong></div>
+            <div class="price-total"><span>Total calculado</span><strong id="price-total">$0,00</strong></div>
+          </details>
+          <p class="courtesy-status" id="courtesy-status"></p>
+          <div class="summary-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-12v7m0-10v.01"/></svg>
+            <p>El valor final depende del tejido, mecanismo, acabados y condiciones de instalación. No realizaremos ningún cobro desde esta página.</p>
+          </div>
+          <div class="lead-fields">
+            <label for="lead-name">Tu nombre</label>
+            <input id="lead-name" name="name" type="text" autocomplete="name" placeholder="¿Cómo podemos llamarte?" />
+            <p class="field-error" id="form-error" aria-live="polite"></p>
+          </div>
+          <button class="send-quote" type="button" id="send-quote">Enviar para cotizar por WhatsApp <span>↗</span></button>
+          <p class="response-copy">Un asesor revisará la información contigo y coordinará la visita técnica.</p>
+        </aside>
+      </section>
+
+      <section class="measure-guide">
+        <div class="measure-copy">
+          <h2>Medir es más fácil de lo que parece.</h2>
+          <p>Para obtener una orientación inicial, mide el ancho y el alto del espacio que quieres cubrir. Usa metros y conserva dos decimales cuando sea posible.</p>
+          <a href="../blog/precio-metro-cuadrado-persianas.html">Entender cómo se calcula una persiana <span>→</span></a>
+        </div>
+        <div class="window-diagram" aria-label="Diagrama para medir una ventana">
+          <div class="measure-width"><span>Ancho</span></div>
+          <div class="measure-height"><span>Alto</span></div>
+          <div class="diagram-light"></div>
+          <div class="diagram-blind"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="quote-footer">
+      <div class="footer-brand brand"><svg viewBox="0 0 44 44" aria-hidden="true"><path fill="currentColor" d="M8 4h10c8 0 12 3 12 9 0 4-2 7-6 8 6 1 9 4 9 9 0 7-5 10-14 10H8V4Zm8 7v7h2c3 0 5-1 5-4 0-2-2-3-5-3h-2Zm0 14v8h3c4 0 6-1 6-4 0-3-2-4-6-4h-3Z"/></svg><span>BLACKOUT<small>WINDOW COVERINGS</small></span></div>
+      <div><strong>Visítanos</strong><p>Av. del Establo N60, Edificio Cemacol, Local 7<br />Toribio Montes N30-49 y Cuero y Caicedo</p></div>
+      <div><strong>Contáctanos</strong><p>info@blackout.com.ec<br />099 293 3619</p></div>
+      <div class="footer-social"><a href="../blog/">Blog</a><a href="../">Sitio principal</a></div>
+      <div class="copyright">© 2026 BLACKOUT WINDOW COVERINGS®</div>
+    </footer>
+
+    <template id="window-template">
+      <article class="window-row">
+        <div class="row-index" aria-hidden="true"></div>
+        <div class="field field-room">
+          <label>Ambiente</label>
+          <input type="text" data-field="room" placeholder="Ej. Sala" />
+        </div>
+        <div class="field field-product">
+          <label>Tipo de persiana</label>
+          <select data-field="product">
+            <option value="screen">Screen · $34/m²</option>
+            <option value="blackout">Blackout · $34/m²</option>
+            <option value="dimout">Dimout · $38/m²</option>
+            <option value="lamina">Lámina de protección solar · $34/m²</option>
+          </select>
+        </div>
+        <div class="field field-measure">
+          <label>Ancho <small>metros</small></label>
+          <input type="number" data-field="width" min="0.2" max="12" step="0.01" inputmode="decimal" />
+        </div>
+        <div class="field field-measure">
+          <label>Alto <small>metros</small></label>
+          <input type="number" data-field="height" min="0.2" max="8" step="0.01" inputmode="decimal" />
+        </div>
+        <button class="remove-window" type="button" aria-label="Eliminar ambiente">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        </button>
+      </article>
+    </template>
+
+    <script src="cotizador.js?v=20260908c"></script>
+  </body>
+</html>
